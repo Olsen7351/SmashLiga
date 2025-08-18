@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="da">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Padel Match Proposal</title>
+    <title>Padel Kampforslag</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
@@ -13,13 +13,13 @@
             font-family: 'Inter', sans-serif;
         }
         /* Simple transition for showing the slots */
-        #slots-container.hidden {
+        #slots-container.hidden, #participant-container.hidden {
             opacity: 0;
             transform: translateY(-10px);
             max-height: 0;
             overflow: hidden;
         }
-        #slots-container {
+        #slots-container, #participant-container {
             opacity: 1;
             transform: translateY(0);
             max-height: 2000px; /* Arbitrary large number */
@@ -29,15 +29,15 @@
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-2xl mx-auto">
+    <div class="w-full max-w-2xl mx-auto space-y-8">
         <main id="proposal-view" class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center">
-            <h1 id="main-title" class="text-3xl font-bold text-emerald-400 mb-2">Padel Match Scheduler</h1>
-            <p id="sub-title" class="text-gray-400 mb-6">Loading your match data...</p>
+            <h1 id="main-title" class="text-3xl font-bold text-emerald-400 mb-2">Padel Kamp Planlægger</h1>
+            <p id="sub-title" class="text-gray-400 mb-6">Indlæser dine kampdata...</p>
             
             <div id="opponent-selector-container" class="mb-6 hidden">
-                <label for="opponent-select" class="block text-left font-medium mb-2 text-gray-300">1. Select Opponent to Schedule</label>
+                <label for="opponent-select" class="block text-left font-medium mb-2 text-gray-300">1. Vælg modstander at planlægge med</label>
                 <select id="opponent-select" class="w-full bg-gray-700 text-white p-3 rounded-lg border-2 border-gray-600 focus:border-emerald-500 focus:outline-none">
-                    <option value="">-- Choose a team --</option>
+                    <option value="">-- Vælg et hold --</option>
                 </select>
             </div>
 
@@ -45,62 +45,111 @@
                 <!-- Time slots will be dynamically inserted here -->
             </div>
         </main>
+
+        <!-- Participant List -->
+        <section id="participant-container" class="bg-gray-800 p-8 rounded-2xl shadow-2xl hidden">
+            <h2 class="text-2xl font-bold text-emerald-400 mb-4 text-center">Deltagere i Ligaen</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="border-b-2 border-gray-700">
+                        <tr>
+                            <th class="p-3 text-gray-300">Navn</th>
+                            <th class="p-3 text-gray-300">Telefon</th>
+                        </tr>
+                    </thead>
+                    <tbody id="participant-table-body">
+                        <!-- Participant rows will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     
-    // --- CONFIGURATION ---
+    // --- KONFIGURATION ---
     const API_URL = "https://api.appwork.dk/Leagues/pools/matches-not-played?includeDuplicateMatches=true";
-    const API_TOKEN = "79br26mwLvOcsLrfNiGQ"; // Your personal authorization token
-    const MY_PHONE_NUMBER = "+4521125950";
-    const MATCH_DURATION_HOURS = 2;
-    const SLOT_INCREMENT_MINUTES = 30;
-    // Define your general availability here
-    const PROPOSED_TIMESPANS = [
+    const API_TOKEN = "79br26mwLvOcsLrfNiGQ"; // Dit personlige authorization token
+    const MIT_TELEFONNUMMER = "+4521125950";
+    const KAMP_VARIGHED_TIMER = 2;
+    const TIDSBLOK_MINUTTER = 30;
+    // Definer din generelle tilgængelighed her
+    const FORESLÅEDE_TIDSRUM = [
         { date: "2025-08-25", startTime: "08:00", endTime: "14:00" },
         { date: "2025-08-26", startTime: "16:00", endTime: "22:00" },
         { date: "2025-08-27", startTime: "09:00", endTime: "21:00" }
     ];
 
-    // --- DOM ELEMENTS ---
+    // --- DOM ELEMENTER ---
     const mainTitle = document.getElementById('main-title');
     const subTitle = document.getElementById('sub-title');
     const opponentSelectorContainer = document.getElementById('opponent-selector-container');
     const opponentSelect = document.getElementById('opponent-select');
     const slotsContainer = document.getElementById('slots-container');
+    const participantContainer = document.getElementById('participant-container');
+    const participantTableBody = document.getElementById('participant-table-body');
+
 
     let leagueData = {};
 
-    // --- HELPER FUNCTIONS ---
-    const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    // --- HJÆLPEFUNKTIONER ---
+    const formatTime = (date) => date.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit', hour12: false });
     const formatDateHeading = (dateString) => {
         const date = new Date(dateString + "T00:00:00");
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        return date.toLocaleDateString(undefined, options);
+        return date.toLocaleDateString('da-DK', options);
     };
     const formatSlotForSMS = (start, end) => {
         const options = { weekday: 'short', month: 'short', day: 'numeric' };
-        const datePart = start.toLocaleDateString(undefined, options);
-        return `${datePart} @ ${formatTime(start)}-${formatTime(end)}`;
+        const datePart = start.toLocaleDateString('da-DK', options);
+        return `${datePart} kl. ${formatTime(start)}-${formatTime(end)}`;
     };
 
-    // --- CORE LOGIC ---
+    // --- KERNE LOGIK ---
 
-    // Generates and displays the time slot buttons for the selected opponent
+    // Viser listen over alle deltagere
+    const renderParticipantList = (allPlayers) => {
+        participantTableBody.innerHTML = '';
+        const sortedPlayers = Array.from(allPlayers.values()).sort((a, b) => a.firstName.localeCompare(b.firstName));
+
+        sortedPlayers.forEach(player => {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-gray-700';
+            
+            const nameCell = document.createElement('td');
+            nameCell.className = 'p-3';
+            nameCell.textContent = `${player.firstName} ${player.lastName}`;
+
+            const phoneCell = document.createElement('td');
+            phoneCell.className = 'p-3';
+            const phoneLink = document.createElement('a');
+            phoneLink.href = `tel:+${player.phoneCountryCode}${player.phone}`;
+            phoneLink.className = 'text-emerald-400 hover:underline';
+            phoneLink.textContent = `+${player.phoneCountryCode} ${player.phone}`;
+            
+            phoneCell.appendChild(phoneLink);
+            row.appendChild(nameCell);
+            row.appendChild(phoneCell);
+            participantTableBody.appendChild(row);
+        });
+        participantContainer.classList.remove('hidden');
+    };
+
+    // Genererer og viser knapper med tidspunkter for den valgte modstander
     const generateTimeSlots = (selectedOpponentId) => {
-        slotsContainer.innerHTML = ''; // Clear previous slots
+        slotsContainer.innerHTML = ''; // Ryd tidligere tidspunkter
         if (!selectedOpponentId) {
             slotsContainer.classList.add('hidden');
             return;
         }
 
-        const myTeamName = `${leagueData.ownTeam.player1.firstName} & ${leagueData.ownTeam.player2.firstName}`;
-        const opponent = leagueData.opponents.get(selectedOpponentId);
+        const mitHoldnavn = `${leagueData.ownTeam.player1.firstName} & ${leagueData.ownTeam.player2.firstName}`;
+        const modstander = leagueData.opponents.get(selectedOpponentId);
         
         let hasSlots = false;
 
-        PROPOSED_TIMESPANS.forEach(span => {
+        FORESLÅEDE_TIDSRUM.forEach(span => {
             const dayContainer = document.createElement('div');
             const heading = document.createElement('h2');
             heading.className = "text-xl font-semibold text-left text-emerald-300 border-b-2 border-gray-700 pb-2 mb-3";
@@ -110,8 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const grid = document.createElement('div');
             grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2";
 
-            const matchDurationMillis = MATCH_DURATION_HOURS * 60 * 60 * 1000;
-            const incrementMillis = SLOT_INCREMENT_MINUTES * 60 * 1000;
+            const matchDurationMillis = KAMP_VARIGHED_TIMER * 60 * 60 * 1000;
+            const incrementMillis = TIDSBLOK_MINUTTER * 60 * 1000;
             const startDateTime = new Date(`${span.date}T${span.startTime}`);
             const endDateTime = new Date(`${span.date}T${span.endTime}`);
 
@@ -127,8 +176,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 button.textContent = `${formatTime(slotStart)} - ${formatTime(slotEnd)}`;
                 
                 button.onclick = () => {
-                    const message = `Hey ${myTeamName}, this is ${opponent.name}. We confirm our match for ${formatSlotForSMS(slotStart, slotEnd)}. See you on the court!`;
-                    window.location.href = `sms:${MY_PHONE_NUMBER}?body=${encodeURIComponent(message)}`;
+                    const message = `Hej ${mitHoldnavn}, her er ${modstander.name}. Vi bekræfter vores kamp den ${formatSlotForSMS(slotStart, slotEnd)}. Vi ses på banen!`;
+                    window.location.href = `sms:${MIT_TELEFONNUMMER}?body=${encodeURIComponent(message)}`;
                 };
                 
                 grid.appendChild(button);
@@ -144,30 +193,42 @@ document.addEventListener('DOMContentLoaded', () => {
         slotsContainer.classList.remove('hidden');
 
         if (!hasSlots) {
-            slotsContainer.innerHTML = '<p class="text-gray-400">No available slots in the defined timespans.</p>';
+            slotsContainer.innerHTML = '<p class="text-gray-400">Ingen ledige tider i de angivne tidsrum.</p>';
         }
     };
 
-    // Fetches data and initializes the application
+    // Henter data og initialiserer applikationen
     const initializeScheduler = async () => {
         try {
-            // **FIXED**: Added the Authorization header to the fetch request
             const response = await fetch(API_URL, {
                 headers: {
                     'Authorization': `Bearer ${API_TOKEN}`
                 }
             });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) throw new Error(`HTTP fejl! status: ${response.status}`);
             const data = await response.json();
             
             leagueData = data[0];
-            const myTeamName = `${leagueData.ownTeam.player1.firstName} & ${leagueData.ownTeam.player2.firstName}`;
-            mainTitle.textContent = `Scheduler for ${myTeamName}`;
+            const mitHoldnavn = `${leagueData.ownTeam.player1.firstName} & ${leagueData.ownTeam.player2.firstName}`;
+            mainTitle.textContent = `Planlægning for ${mitHoldnavn}`;
 
-            // Use a Map to store unique opponents, as you play some teams twice
+            // Saml alle unikke spillere og modstanderhold
+            const allPlayers = new Map();
+            const addPlayer = (player) => {
+                if (player && player.id && !allPlayers.has(player.id)) {
+                    allPlayers.set(player.id, player);
+                }
+            };
+            
+            addPlayer(leagueData.ownTeam.player1);
+            addPlayer(leagueData.ownTeam.player2);
+
             leagueData.opponents = new Map();
             leagueData.matchInfo.forEach(match => {
                 const opponent = match.opponentTeam;
+                addPlayer(opponent.player1);
+                addPlayer(opponent.player2);
+                
                 const opponentId = opponent.id;
                 if (!leagueData.opponents.has(opponentId)) {
                     leagueData.opponents.set(opponentId, {
@@ -177,7 +238,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Populate the dropdown
+            // Vis deltagerlisten
+            renderParticipantList(allPlayers);
+
+            // Udfyld dropdown med modstandere
             leagueData.opponents.forEach(opponent => {
                 const option = document.createElement('option');
                 option.value = opponent.id;
@@ -185,12 +249,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 opponentSelect.appendChild(option);
             });
 
-            subTitle.textContent = "Select a team from the dropdown to see available time slots.";
+            subTitle.textContent = "Vælg et hold fra menuen for at se ledige spilletider.";
             opponentSelectorContainer.classList.remove('hidden');
 
         } catch (error) {
-            console.error("Failed to fetch league data:", error);
-            subTitle.textContent = "Error: Could not load match data. Please try again later.";
+            console.error("Kunne ikke hente ligadata:", error);
+            subTitle.textContent = "Fejl: Kunne ikke indlæse kampdata. Prøv venligst igen senere.";
             subTitle.classList.add('text-red-400');
         }
     };
@@ -207,3 +271,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
