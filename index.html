@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Padel Match Scheduler</title>
+    <title>Padel Match Proposal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,219 +12,118 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* A simple fade-in for added items */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-            animation: fadeIn 0.3s ease-out forwards;
-        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
 
     <div class="w-full max-w-2xl mx-auto">
-        
-        <!-- Main Title -->
-        <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-emerald-400">Padel Match Scheduler</h1>
-            <p class="text-gray-400 mt-2">Create a downloadable schedule file for your opponents.</p>
-        </header>
-
-        <!-- Planner View -->
-        <main id="planner-view" class="bg-gray-800 p-8 rounded-2xl shadow-2xl space-y-6">
-            <div>
-                <h2 class="text-2xl font-semibold mb-4">1. Enter Match Details</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" id="your-team" placeholder="Your Team Name" class="w-full bg-gray-700 text-white p-3 rounded-lg border-2 border-gray-600 focus:border-emerald-500 focus:outline-none">
-                    <input type="text" id="opponent-team" placeholder="Opponent Team Name" class="w-full bg-gray-700 text-white p-3 rounded-lg border-2 border-gray-600 focus:border-emerald-500 focus:outline-none">
-                </div>
-                 <input type="tel" id="your-phone" placeholder="Your Phone Number (e.g., +4512345678)" class="mt-4 w-full bg-gray-700 text-white p-3 rounded-lg border-2 border-gray-600 focus:border-emerald-500 focus:outline-none">
+        <main id="proposal-view" class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center">
+            <h1 id="main-title" class="text-3xl font-bold text-emerald-400 mb-2">Padel Match Proposal</h1>
+            <p id="sub-title" class="text-gray-400 mb-6">Please select a 2-hour slot below to confirm your match via SMS.</p>
+            <div id="slots-container" class="space-y-4">
+                <!-- Time slots will be dynamically inserted here -->
             </div>
-
-            <div>
-                <h2 class="text-2xl font-semibold mb-4">2. Propose Time Slots</h2>
-                <div class="flex items-center gap-4">
-                    <input type="datetime-local" id="datetime-picker" class="w-full bg-gray-700 text-white p-3 rounded-lg border-2 border-gray-600 focus:border-emerald-500 focus:outline-none" style="color-scheme: dark;">
-                    <button id="add-time-btn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg transition-colors">Add</button>
-                </div>
-                <div id="time-slots-container" class="mt-4 space-y-2">
-                    <!-- Proposed times will be injected here -->
-                </div>
-            </div>
-
-            <button id="generate-file-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-lg text-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" disabled>
-                Generate & Download File
-            </button>
         </main>
-
     </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // --- STATE ---
-    let proposedTimes = [];
+    
+    // --- CONFIGURATION ---
+    const scheduleData = {
+        myTeam: "The Padel Planners",
+        opponentTeam: "Our Opponent",
+        myPhoneNumber: "+4521125950",
+        matchDurationHours: 2, // The duration of a match in hours
+        slotIncrementMinutes: 30, // The interval between possible start times (e.g., 30 for 8:00, 8:30, 9:00)
+        // Define available time spans
+        proposedTimespans: [
+            { date: "2025-08-25", startTime: "08:00", endTime: "14:00" },
+            { date: "2025-08-26", startTime: "16:00", endTime: "22:00" },
+            { date: "2025-08-27", startTime: "09:00", endTime: "21:00" } // All day availability
+        ]
+    };
 
     // --- DOM ELEMENTS ---
-    const yourTeamInput = document.getElementById('your-team');
-    const opponentTeamInput = document.getElementById('opponent-team');
-    const yourPhoneInput = document.getElementById('your-phone');
-    const datetimePicker = document.getElementById('datetime-picker');
-    const addTimeBtn = document.getElementById('add-time-btn');
-    const timeSlotsContainer = document.getElementById('time-slots-container');
-    const generateFileBtn = document.getElementById('generate-file-btn');
+    const mainTitle = document.getElementById('main-title');
+    const subTitle = document.getElementById('sub-title');
+    const slotsContainer = document.getElementById('slots-container');
 
     // --- FUNCTIONS ---
 
-    // Check if all required fields are filled to enable the generate button
-    const validateForm = () => {
-        const isFormValid = yourTeamInput.value.trim() !== '' &&
-                            opponentTeamInput.value.trim() !== '' &&
-                            yourPhoneInput.value.trim() !== '' &&
-                            proposedTimes.length > 0;
-        generateFileBtn.disabled = !isFormValid;
+    // Formats a Date object into a time string like "14:00"
+    const formatTime = (date) => {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     };
 
-    // Format date for display
-    const formatDateTime = (isoString) => {
-        const date = new Date(isoString);
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-        return date.toLocaleDateString(undefined, options);
-    };
-
-    // Render the list of proposed time slots in the planner view
-    const renderTimeSlots = () => {
-        timeSlotsContainer.innerHTML = '';
-        proposedTimes.forEach((time, index) => {
-            const div = document.createElement('div');
-            div.className = 'flex justify-between items-center bg-gray-700 p-3 rounded-lg animate-fade-in';
-            div.innerHTML = `
-                <span class="text-gray-200">${formatDateTime(time)}</span>
-                <button data-index="${index}" class="remove-time-btn text-red-400 hover:text-red-300 font-bold text-xl px-2">&times;</button>
-            `;
-            timeSlotsContainer.appendChild(div);
-        });
-        validateForm();
-    };
-
-    // Add a new time slot
-    const addTime = () => {
-        const newTime = datetimePicker.value;
-        if (newTime && !proposedTimes.includes(newTime)) {
-            proposedTimes.push(newTime);
-            proposedTimes.sort(); // Keep times in chronological order
-            renderTimeSlots();
-            datetimePicker.value = '';
-        }
-    };
-
-    // Remove a time slot
-    const removeTime = (index) => {
-        proposedTimes.splice(index, 1);
-        renderTimeSlots();
-    };
-
-    // Generate the HTML file for the opponent and trigger a download
-    const generateAndDownloadFile = () => {
-        const data = {
-            yt: yourTeamInput.value.trim(),
-            ot: opponentTeamInput.value.trim(),
-            yp: yourPhoneInput.value.trim(),
-            ts: proposedTimes
-        };
-
-        // This is the complete HTML content for the file the opponent will receive.
-        // The data is embedded directly into a script tag.
-        const fileContent = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Padel Match Proposal for ${data.ot}</title>
-    <script src="https://cdn.tailwindcss.com"><\/script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style> body { font-family: 'Inter', sans-serif; } </style>
-</head>
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
-    <div class="w-full max-w-2xl mx-auto">
-        <section class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center">
-            <h1 class="text-3xl font-bold text-emerald-400 mb-2">Match Proposal from ${data.yt}</h1>
-            <p class="text-gray-400 mb-6">Hi ${data.ot}! Please select a time below to confirm your match via SMS.</p>
-            <div id="opponent-slots-container" class="space-y-3">
-                <!-- Slots will be generated by JS -->
-            </div>
-        </section>
-    </div>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    // The data is embedded directly here!
-    const proposalData = ${JSON.stringify(data)};
-
-    const slotsContainer = document.getElementById('opponent-slots-container');
-
-    const formatDateTime = (isoString) => {
-        const date = new Date(isoString);
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    // Formats a date for a heading, e.g., "Monday, August 25, 2025"
+    const formatDateHeading = (dateString) => {
+        const date = new Date(dateString + "T00:00:00"); // Add time to avoid timezone issues
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         return date.toLocaleDateString(undefined, options);
     };
     
-    const formatDateTimeShort = (isoString) => {
-        const date = new Date(isoString);
-        const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-        return date.toLocaleDateString(undefined, options);
+    // Formats a slot for the SMS message, e.g., "Mon, Aug 25 @ 14:00-16:00"
+    const formatSlotForSMS = (start, end) => {
+        const options = { weekday: 'short', month: 'short', day: 'numeric' };
+        const datePart = start.toLocaleDateString(undefined, options);
+        return `${datePart} @ ${formatTime(start)}-${formatTime(end)}`;
     };
 
-    const { yt, ot, yp, ts } = proposalData;
+    // --- INITIALIZATION ---
     
-    ts.forEach(time => {
-        const button = document.createElement('button');
-        button.className = 'w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-4 rounded-lg text-lg transition-colors';
-        button.textContent = formatDateTime(time);
-        button.onclick = () => {
-            const message = \`Hey \${yt}, this is \${ot}. We confirm our match for \${formatDateTimeShort(time)}. See you on the court!\`;
-            window.location.href = \`sms:\${yp}?body=\${encodeURIComponent(message)}\`;
-        };
-        slotsContainer.appendChild(button);
-    });
-});
-<\/script>
-</body>
-</html>`;
+    mainTitle.textContent = `Match Proposal from ${scheduleData.myTeam}`;
+    subTitle.textContent = `Hi ${scheduleData.opponentTeam}! Please select a ${scheduleData.matchDurationHours}-hour slot below to confirm our match.`;
 
-        // Create a Blob (Binary Large Object) from the HTML string
-        const blob = new Blob([fileContent], { type: 'text/html' });
-        
-        // Create a temporary link element to trigger the download
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `Padel_Proposal_for_${data.ot.replace(/\s+/g, '_')}.html`; // Create a clean filename
-        document.body.appendChild(a);
-        a.click(); // Programmatically click the link to start the download
-        document.body.removeChild(a); // Clean up by removing the link
-    };
+    let hasSlots = false;
 
-    // --- EVENT LISTENERS ---
-    addTimeBtn.addEventListener('click', addTime);
-    datetimePicker.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            addTime();
+    // Process each defined timespan
+    scheduleData.proposedTimespans.forEach(span => {
+        const dayContainer = document.createElement('div');
+        const heading = document.createElement('h2');
+        heading.className = "text-xl font-semibold text-left text-emerald-300 border-b-2 border-gray-700 pb-2 mb-3";
+        heading.textContent = formatDateHeading(span.date);
+        dayContainer.appendChild(heading);
+
+        const grid = document.createElement('div');
+        grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2";
+
+        const matchDurationMillis = scheduleData.matchDurationHours * 60 * 60 * 1000;
+        const incrementMillis = scheduleData.slotIncrementMinutes * 60 * 1000;
+
+        const startDateTime = new Date(`${span.date}T${span.startTime}`);
+        const endDateTime = new Date(`${span.date}T${span.endTime}`);
+
+        let currentStartTime = startDateTime.getTime();
+
+        // Loop through the timespan and generate slots
+        while (currentStartTime + matchDurationMillis <= endDateTime.getTime()) {
+            hasSlots = true;
+            const slotStart = new Date(currentStartTime);
+            const slotEnd = new Date(currentStartTime + matchDurationMillis);
+
+            const button = document.createElement('button');
+            button.className = 'w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-2 rounded-lg transition-colors text-sm';
+            button.textContent = `${formatTime(slotStart)} - ${formatTime(slotEnd)}`;
+            
+            button.onclick = () => {
+                const message = `Hey ${scheduleData.myTeam}, this is ${scheduleData.opponentTeam}. We confirm our match for ${formatSlotForSMS(slotStart, slotEnd)}. See you on the court!`;
+                window.location.href = `sms:${scheduleData.myPhoneNumber}?body=${encodeURIComponent(message)}`;
+            };
+            
+            grid.appendChild(button);
+            currentStartTime += incrementMillis;
+        }
+
+        if (grid.hasChildNodes()) {
+            dayContainer.appendChild(grid);
+            slotsContainer.appendChild(dayContainer);
         }
     });
 
-    timeSlotsContainer.addEventListener('click', (e) => {
-        if (e.target.closest('.remove-time-btn')) {
-            removeTime(e.target.closest('.remove-time-btn').dataset.index);
-        }
-    });
-
-    [yourTeamInput, opponentTeamInput, yourPhoneInput].forEach(input => {
-        input.addEventListener('input', validateForm);
-    });
-
-    generateFileBtn.addEventListener('click', generateAndDownloadFile);
+    if (!hasSlots) {
+        slotsContainer.innerHTML = '<p class="text-gray-400">No match times have been proposed yet.</p>';
+    }
 });
 </script>
 
