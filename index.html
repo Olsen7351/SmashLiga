@@ -6,11 +6,24 @@
     <title>Padel Match Proposal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+        }
+        /* Simple transition for showing the slots */
+        #slots-container.hidden {
+            opacity: 0;
+            transform: translateY(-10px);
+            max-height: 0;
+            overflow: hidden;
+        }
+        #slots-container {
+            opacity: 1;
+            transform: translateY(0);
+            max-height: 2000px; /* Arbitrary large number */
+            transition: all 0.5s ease-in-out;
         }
     </style>
 </head>
@@ -18,9 +31,17 @@
 
     <div class="w-full max-w-2xl mx-auto">
         <main id="proposal-view" class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center">
-            <h1 id="main-title" class="text-3xl font-bold text-emerald-400 mb-2">Padel Match Proposal</h1>
-            <p id="sub-title" class="text-gray-400 mb-6">Please select a 2-hour slot below to confirm your match via SMS.</p>
-            <div id="slots-container" class="space-y-4">
+            <h1 id="main-title" class="text-3xl font-bold text-emerald-400 mb-2">Padel Match Scheduler</h1>
+            <p id="sub-title" class="text-gray-400 mb-6">Loading your match data...</p>
+            
+            <div id="opponent-selector-container" class="mb-6 hidden">
+                <label for="opponent-select" class="block text-left font-medium mb-2 text-gray-300">1. Select Opponent to Schedule</label>
+                <select id="opponent-select" class="w-full bg-gray-700 text-white p-3 rounded-lg border-2 border-gray-600 focus:border-emerald-500 focus:outline-none">
+                    <option value="">-- Choose a team --</option>
+                </select>
+            </div>
+
+            <div id="slots-container" class="space-y-4 hidden">
                 <!-- Time slots will be dynamically inserted here -->
             </div>
         </main>
@@ -30,100 +51,157 @@
 document.addEventListener('DOMContentLoaded', () => {
     
     // --- CONFIGURATION ---
-    const scheduleData = {
-        myTeam: "The Padel Planners",
-        opponentTeam: "Our Opponent",
-        myPhoneNumber: "+4521125950",
-        matchDurationHours: 2, // The duration of a match in hours
-        slotIncrementMinutes: 30, // The interval between possible start times (e.g., 30 for 8:00, 8:30, 9:00)
-        // Define available time spans
-        proposedTimespans: [
-            { date: "2025-08-25", startTime: "08:00", endTime: "14:00" },
-            { date: "2025-08-26", startTime: "16:00", endTime: "22:00" },
-            { date: "2025-08-27", startTime: "09:00", endTime: "21:00" } // All day availability
-        ]
-    };
+    const API_URL = "https://api.appwork.dk/Leagues/pools/matches-not-played?includeDuplicateMatches=true";
+    const API_TOKEN = "79br26mwLvOcsLrfNiGQ"; // Your personal authorization token
+    const MY_PHONE_NUMBER = "+4521125950";
+    const MATCH_DURATION_HOURS = 2;
+    const SLOT_INCREMENT_MINUTES = 30;
+    // Define your general availability here
+    const PROPOSED_TIMESPANS = [
+        { date: "2025-08-25", startTime: "08:00", endTime: "14:00" },
+        { date: "2025-08-26", startTime: "16:00", endTime: "22:00" },
+        { date: "2025-08-27", startTime: "09:00", endTime: "21:00" }
+    ];
 
     // --- DOM ELEMENTS ---
     const mainTitle = document.getElementById('main-title');
     const subTitle = document.getElementById('sub-title');
+    const opponentSelectorContainer = document.getElementById('opponent-selector-container');
+    const opponentSelect = document.getElementById('opponent-select');
     const slotsContainer = document.getElementById('slots-container');
 
-    // --- FUNCTIONS ---
+    let leagueData = {};
 
-    // Formats a Date object into a time string like "14:00"
-    const formatTime = (date) => {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    };
-
-    // Formats a date for a heading, e.g., "Monday, August 25, 2025"
+    // --- HELPER FUNCTIONS ---
+    const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     const formatDateHeading = (dateString) => {
-        const date = new Date(dateString + "T00:00:00"); // Add time to avoid timezone issues
+        const date = new Date(dateString + "T00:00:00");
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         return date.toLocaleDateString(undefined, options);
     };
-    
-    // Formats a slot for the SMS message, e.g., "Mon, Aug 25 @ 14:00-16:00"
     const formatSlotForSMS = (start, end) => {
         const options = { weekday: 'short', month: 'short', day: 'numeric' };
         const datePart = start.toLocaleDateString(undefined, options);
         return `${datePart} @ ${formatTime(start)}-${formatTime(end)}`;
     };
 
-    // --- INITIALIZATION ---
-    
-    mainTitle.textContent = `Match Proposal from ${scheduleData.myTeam}`;
-    subTitle.textContent = `Hi ${scheduleData.opponentTeam}! Please select a ${scheduleData.matchDurationHours}-hour slot below to confirm our match.`;
+    // --- CORE LOGIC ---
 
-    let hasSlots = false;
-
-    // Process each defined timespan
-    scheduleData.proposedTimespans.forEach(span => {
-        const dayContainer = document.createElement('div');
-        const heading = document.createElement('h2');
-        heading.className = "text-xl font-semibold text-left text-emerald-300 border-b-2 border-gray-700 pb-2 mb-3";
-        heading.textContent = formatDateHeading(span.date);
-        dayContainer.appendChild(heading);
-
-        const grid = document.createElement('div');
-        grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2";
-
-        const matchDurationMillis = scheduleData.matchDurationHours * 60 * 60 * 1000;
-        const incrementMillis = scheduleData.slotIncrementMinutes * 60 * 1000;
-
-        const startDateTime = new Date(`${span.date}T${span.startTime}`);
-        const endDateTime = new Date(`${span.date}T${span.endTime}`);
-
-        let currentStartTime = startDateTime.getTime();
-
-        // Loop through the timespan and generate slots
-        while (currentStartTime + matchDurationMillis <= endDateTime.getTime()) {
-            hasSlots = true;
-            const slotStart = new Date(currentStartTime);
-            const slotEnd = new Date(currentStartTime + matchDurationMillis);
-
-            const button = document.createElement('button');
-            button.className = 'w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-2 rounded-lg transition-colors text-sm';
-            button.textContent = `${formatTime(slotStart)} - ${formatTime(slotEnd)}`;
-            
-            button.onclick = () => {
-                const message = `Hey ${scheduleData.myTeam}, this is ${scheduleData.opponentTeam}. We confirm our match for ${formatSlotForSMS(slotStart, slotEnd)}. See you on the court!`;
-                window.location.href = `sms:${scheduleData.myPhoneNumber}?body=${encodeURIComponent(message)}`;
-            };
-            
-            grid.appendChild(button);
-            currentStartTime += incrementMillis;
+    // Generates and displays the time slot buttons for the selected opponent
+    const generateTimeSlots = (selectedOpponentId) => {
+        slotsContainer.innerHTML = ''; // Clear previous slots
+        if (!selectedOpponentId) {
+            slotsContainer.classList.add('hidden');
+            return;
         }
 
-        if (grid.hasChildNodes()) {
-            dayContainer.appendChild(grid);
-            slotsContainer.appendChild(dayContainer);
+        const myTeamName = `${leagueData.ownTeam.player1.firstName} & ${leagueData.ownTeam.player2.firstName}`;
+        const opponent = leagueData.opponents.get(selectedOpponentId);
+        
+        let hasSlots = false;
+
+        PROPOSED_TIMESPANS.forEach(span => {
+            const dayContainer = document.createElement('div');
+            const heading = document.createElement('h2');
+            heading.className = "text-xl font-semibold text-left text-emerald-300 border-b-2 border-gray-700 pb-2 mb-3";
+            heading.textContent = formatDateHeading(span.date);
+            dayContainer.appendChild(heading);
+
+            const grid = document.createElement('div');
+            grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2";
+
+            const matchDurationMillis = MATCH_DURATION_HOURS * 60 * 60 * 1000;
+            const incrementMillis = SLOT_INCREMENT_MINUTES * 60 * 1000;
+            const startDateTime = new Date(`${span.date}T${span.startTime}`);
+            const endDateTime = new Date(`${span.date}T${span.endTime}`);
+
+            let currentStartTime = startDateTime.getTime();
+
+            while (currentStartTime + matchDurationMillis <= endDateTime.getTime()) {
+                hasSlots = true;
+                const slotStart = new Date(currentStartTime);
+                const slotEnd = new Date(currentStartTime + matchDurationMillis);
+
+                const button = document.createElement('button');
+                button.className = 'w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-2 rounded-lg transition-colors text-sm';
+                button.textContent = `${formatTime(slotStart)} - ${formatTime(slotEnd)}`;
+                
+                button.onclick = () => {
+                    const message = `Hey ${myTeamName}, this is ${opponent.name}. We confirm our match for ${formatSlotForSMS(slotStart, slotEnd)}. See you on the court!`;
+                    window.location.href = `sms:${MY_PHONE_NUMBER}?body=${encodeURIComponent(message)}`;
+                };
+                
+                grid.appendChild(button);
+                currentStartTime += incrementMillis;
+            }
+
+            if (grid.hasChildNodes()) {
+                dayContainer.appendChild(grid);
+                slotsContainer.appendChild(dayContainer);
+            }
+        });
+        
+        slotsContainer.classList.remove('hidden');
+
+        if (!hasSlots) {
+            slotsContainer.innerHTML = '<p class="text-gray-400">No available slots in the defined timespans.</p>';
         }
+    };
+
+    // Fetches data and initializes the application
+    const initializeScheduler = async () => {
+        try {
+            // **FIXED**: Added the Authorization header to the fetch request
+            const response = await fetch(API_URL, {
+                headers: {
+                    'Authorization': `Bearer ${API_TOKEN}`
+                }
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            
+            leagueData = data[0];
+            const myTeamName = `${leagueData.ownTeam.player1.firstName} & ${leagueData.ownTeam.player2.firstName}`;
+            mainTitle.textContent = `Scheduler for ${myTeamName}`;
+
+            // Use a Map to store unique opponents, as you play some teams twice
+            leagueData.opponents = new Map();
+            leagueData.matchInfo.forEach(match => {
+                const opponent = match.opponentTeam;
+                const opponentId = opponent.id;
+                if (!leagueData.opponents.has(opponentId)) {
+                    leagueData.opponents.set(opponentId, {
+                        id: opponentId,
+                        name: `${opponent.player1.firstName} & ${opponent.player2.firstName}`
+                    });
+                }
+            });
+
+            // Populate the dropdown
+            leagueData.opponents.forEach(opponent => {
+                const option = document.createElement('option');
+                option.value = opponent.id;
+                option.textContent = opponent.name;
+                opponentSelect.appendChild(option);
+            });
+
+            subTitle.textContent = "Select a team from the dropdown to see available time slots.";
+            opponentSelectorContainer.classList.remove('hidden');
+
+        } catch (error) {
+            console.error("Failed to fetch league data:", error);
+            subTitle.textContent = "Error: Could not load match data. Please try again later.";
+            subTitle.classList.add('text-red-400');
+        }
+    };
+
+    // --- EVENT LISTENERS ---
+    opponentSelect.addEventListener('change', (e) => {
+        generateTimeSlots(e.target.value);
     });
 
-    if (!hasSlots) {
-        slotsContainer.innerHTML = '<p class="text-gray-400">No match times have been proposed yet.</p>';
-    }
+    // --- START ---
+    initializeScheduler();
 });
 </script>
 
