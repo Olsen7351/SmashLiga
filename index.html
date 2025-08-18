@@ -22,8 +22,29 @@
         #slots-container, #participant-container {
             opacity: 1;
             transform: translateY(0);
-            max-height: 2000px; /* Arbitrary large number */
             transition: all 0.5s ease-in-out;
+        }
+        /* Make slots container scrollable */
+        #slots-container {
+            max-height: 50vh; /* Max height is 50% of the screen height */
+            overflow-y: auto; /* Enable vertical scrolling */
+            padding-right: 10px; /* Space for the scrollbar */
+        }
+
+        /* Custom scrollbar for a better look */
+        #slots-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #slots-container::-webkit-scrollbar-track {
+            background: #1a202c; /* bg-gray-900 */
+            border-radius: 10px;
+        }
+        #slots-container::-webkit-scrollbar-thumb {
+            background: #4a5568; /* bg-gray-600 */
+            border-radius: 10px;
+        }
+        #slots-container::-webkit-scrollbar-thumb:hover {
+            background: #718096; /* bg-gray-500 */
         }
     </style>
 </head>
