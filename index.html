@@ -74,12 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const MIT_TELEFONNUMMER = "+4521125950";
     const KAMP_VARIGHED_TIMER = 2;
     const TIDSBLOK_MINUTTER = 30;
-    // Definer din generelle tilgængelighed her
-    const FORESLÅEDE_TIDSRUM = [
-        { date: "2025-08-25", startTime: "08:00", endTime: "14:00" },
-        { date: "2025-08-26", startTime: "16:00", endTime: "22:00" },
-        { date: "2025-08-27", startTime: "09:00", endTime: "21:00" }
-    ];
 
     // --- DOM ELEMENTER ---
     const mainTitle = document.getElementById('main-title');
@@ -89,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const slotsContainer = document.getElementById('slots-container');
     const participantContainer = document.getElementById('participant-container');
     const participantTableBody = document.getElementById('participant-table-body');
-
 
     let leagueData = {};
 
@@ -104,6 +97,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const options = { weekday: 'short', month: 'short', day: 'numeric' };
         const datePart = start.toLocaleDateString('da-DK', options);
         return `${datePart} kl. ${formatTime(start)}-${formatTime(end)}`;
+    };
+    
+    // --- DYNAMISK TIDSPLAN GENERATOR ---
+    const generateAvailableTimespans = () => {
+        const spans = [];
+        const noGoDates = new Set([
+            "2025-08-23", "2025-09-12", "2025-09-13", "2025-09-14", 
+            "2025-09-28", "2025-10-03", "2025-10-04", "2025-10-05", 
+            "2025-10-11", "2025-11-01"
+        ]);
+        
+        const startDate = new Date(); // Starter fra i dag
+        const endDate = new Date("2025-11-20T23:59:59");
+
+        let currentDate = startDate;
+
+        while (currentDate <= endDate) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const dayOfWeek = currentDate.getDay(); // 0=Søndag, 1=Mandag, ..., 6=Lørdag
+
+            if (!noGoDates.has(dateStr)) {
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Hverdage
+                    if (dayOfWeek === 3) { // Onsdag
+                        // Ingen tider
+                    } else if (dayOfWeek === 4) { // Torsdag
+                        spans.push({ date: dateStr, startTime: "17:00", endTime: "20:00" });
+                    } else { // Mandag, Tirsdag, Fredag
+                        spans.push({ date: dateStr, startTime: "16:00", endTime: "20:00" });
+                    }
+                } else { // Weekend (Lørdag, Søndag)
+                    spans.push({ date: dateStr, startTime: "07:00", endTime: "12:00" });
+                }
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        return spans;
     };
 
     // --- KERNE LOGIK ---
@@ -146,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const mitHoldnavn = `${leagueData.ownTeam.player1.firstName} & ${leagueData.ownTeam.player2.firstName}`;
         const modstander = leagueData.opponents.get(selectedOpponentId);
+        const FORESLÅEDE_TIDSRUM = generateAvailableTimespans();
         
         let hasSlots = false;
 
@@ -212,7 +242,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const mitHoldnavn = `${leagueData.ownTeam.player1.firstName} & ${leagueData.ownTeam.player2.firstName}`;
             mainTitle.textContent = `Planlægning for ${mitHoldnavn}`;
 
-            // Saml alle unikke spillere og modstanderhold
             const allPlayers = new Map();
             const addPlayer = (player) => {
                 if (player && player.id && !allPlayers.has(player.id)) {
@@ -238,10 +267,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Vis deltagerlisten
             renderParticipantList(allPlayers);
 
-            // Udfyld dropdown med modstandere
             leagueData.opponents.forEach(opponent => {
                 const option = document.createElement('option');
                 option.value = opponent.id;
@@ -271,4 +298,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
-
