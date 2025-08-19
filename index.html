@@ -6,13 +6,12 @@
     <title>Padel Kampforslag</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Simple transition for showing the slots */
         #slots-container.hidden, #participant-container.hidden {
             opacity: 0;
             transform: translateY(-10px);
@@ -24,27 +23,24 @@
             transform: translateY(0);
             transition: all 0.5s ease-in-out;
         }
-        /* Make slots container scrollable */
         #slots-container {
-            max-height: 50vh; /* Max height is 50% of the screen height */
-            overflow-y: auto; /* Enable vertical scrolling */
-            padding-right: 10px; /* Space for the scrollbar */
+            max-height: 50vh;
+            overflow-y: auto;
+            padding-right: 10px;
         }
-
-        /* Custom scrollbar for a better look */
         #slots-container::-webkit-scrollbar {
             width: 8px;
         }
         #slots-container::-webkit-scrollbar-track {
-            background: #1a202c; /* bg-gray-900 */
+            background: #1a202c;
             border-radius: 10px;
         }
         #slots-container::-webkit-scrollbar-thumb {
-            background: #4a5568; /* bg-gray-600 */
+            background: #4a5568;
             border-radius: 10px;
         }
         #slots-container::-webkit-scrollbar-thumb:hover {
-            background: #718096; /* bg-gray-500 */
+            background: #718096;
         }
     </style>
 </head>
@@ -63,11 +59,9 @@
             </div>
 
             <div id="slots-container" class="space-y-4 hidden">
-                <!-- Time slots will be dynamically inserted here -->
             </div>
         </main>
 
-        <!-- Participant List -->
         <section id="participant-container" class="bg-gray-800 p-8 rounded-2xl shadow-2xl hidden">
             <h2 class="text-2xl font-bold text-emerald-400 mb-4 text-center">Deltagere i Ligaen</h2>
             <div class="overflow-x-auto">
@@ -79,7 +73,6 @@
                         </tr>
                     </thead>
                     <tbody id="participant-table-body">
-                        <!-- Participant rows will be inserted here -->
                     </tbody>
                 </table>
             </div>
@@ -89,14 +82,12 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     
-    // --- KONFIGURATION ---
     const API_URL = "https://api.appwork.dk/Leagues/pools/matches-not-played?includeDuplicateMatches=true";
-    const API_TOKEN = "79br26mwLvOcsLrfNiGQ"; // Dit personlige authorization token
+    const API_TOKEN = "79br26mwLvOcsLrfNiGQ";
     const MIT_TELEFONNUMMER = "+4521125950";
     const KAMP_VARIGHED_TIMER = 2;
     const TIDSBLOK_MINUTTER = 30;
 
-    // --- DOM ELEMENTER ---
     const mainTitle = document.getElementById('main-title');
     const subTitle = document.getElementById('sub-title');
     const opponentSelectorContainer = document.getElementById('opponent-selector-container');
@@ -107,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let leagueData = {};
 
-    // --- HJÆLPEFUNKTIONER ---
     const formatTime = (date) => date.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit', hour12: false });
     const formatDateHeading = (dateString) => {
         const date = new Date(dateString + "T00:00:00");
@@ -120,7 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${datePart} kl. ${formatTime(start)}-${formatTime(end)}`;
     };
     
-    // --- DYNAMISK TIDSPLAN GENERATOR ---
     const generateAvailableTimespans = () => {
         const spans = [];
         const noGoDates = new Set([
@@ -129,26 +118,33 @@ document.addEventListener('DOMContentLoaded', () => {
             "2025-10-11", "2025-11-01"
         ]);
         
-        const startDate = new Date(); // Starter fra i dag
+        const startDate = new Date();
         const endDate = new Date("2025-11-20T23:59:59");
 
         let currentDate = startDate;
 
         while (currentDate <= endDate) {
             const dateStr = currentDate.toISOString().split('T')[0];
-            const dayOfWeek = currentDate.getDay(); // 0=Søndag, 1=Mandag, ..., 6=Lørdag
+            const dayOfWeek = currentDate.getDay();
 
             if (!noGoDates.has(dateStr)) {
-                if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Hverdage
-                    if (dayOfWeek === 3) { // Onsdag
-                        // Ingen tider
-                    } else if (dayOfWeek === 4) { // Torsdag
-                        spans.push({ date: dateStr, startTime: "17:00", endTime: "20:00" });
-                    } else { // Mandag, Tirsdag, Fredag
-                        spans.push({ date: dateStr, startTime: "16:00", endTime: "20:00" });
-                    }
-                } else { // Weekend (Lørdag, Søndag)
-                    spans.push({ date: dateStr, startTime: "07:00", endTime: "12:00" });
+                switch (dayOfWeek) {
+                    case 1: 
+                        spans.push({ date: dateStr, startTime: "18:30", endTime: "22:00" });
+                        break;
+                    case 2:
+                        spans.push({ date: dateStr, startTime: "18:30", endTime: "22:00" });
+                        break;
+                    case 3:
+                        spans.push({ date: dateStr, startTime: "09:00", endTime: "12:00" });
+                        break;
+                    case 6:
+                        spans.push({ date: dateStr, startTime: "07:00", endTime: "12:00" });
+                        break;
+                    case 0:
+                        spans.push({ date: dateStr, startTime: "07:00", endTime: "12:00" });
+                        spans.push({ date: dateStr, startTime: "17:00", endTime: "21:00" });
+                        break;
                 }
             }
             currentDate.setDate(currentDate.getDate() + 1);
@@ -156,9 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return spans;
     };
 
-    // --- KERNE LOGIK ---
-
-    // Viser listen over alle deltagere
     const renderParticipantList = (allPlayers) => {
         participantTableBody.innerHTML = '';
         const sortedPlayers = Array.from(allPlayers.values()).sort((a, b) => a.firstName.localeCompare(b.firstName));
@@ -186,9 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
         participantContainer.classList.remove('hidden');
     };
 
-    // Genererer og viser knapper med tidspunkter for den valgte modstander
     const generateTimeSlots = (selectedOpponentId) => {
-        slotsContainer.innerHTML = ''; // Ryd tidligere tidspunkter
+        slotsContainer.innerHTML = '';
         if (!selectedOpponentId) {
             slotsContainer.classList.add('hidden');
             return;
@@ -248,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Henter data og initialiserer applikationen
     const initializeScheduler = async () => {
         try {
             const response = await fetch(API_URL, {
@@ -307,12 +298,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- EVENT LISTENERS ---
     opponentSelect.addEventListener('change', (e) => {
         generateTimeSlots(e.target.value);
     });
 
-    // --- START ---
     initializeScheduler();
 });
 </script>
